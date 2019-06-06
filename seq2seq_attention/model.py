@@ -1,5 +1,8 @@
 # -*- coding:utf-8 -*-
 
+""" A Tensorflow implementation of Sequence-to-Sequence Model with attention mechanism.
+"""
+
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
@@ -9,7 +12,9 @@ import tensorflow as tf
 
 
 class Seq2SeqModel(object):
+
 	def __init__(self, hparam, word_to_index):
+
 		self.learning_rate = hparam.learning_rate
 		self.embedding_dim = hparam.embedding_dim
 		self.num_layers = hparam.num_layers
@@ -35,6 +40,7 @@ class Seq2SeqModel(object):
 		self.init = tf.global_variables_initializer()
 
 	def _create_rnn_cell(self, reuse):
+
 		def single_rnn_cell():
 			if self.rnn_type == "lstm":
 				single_cell = tf.contrib.rnn.LSTMCell(self.hidden_dim, reuse=reuse)
@@ -44,8 +50,10 @@ class Seq2SeqModel(object):
 				raise ValueError("Unsupported rnn_type.")
 			cell = tf.contrib.rnn.DropoutWrapper(single_cell, output_keep_prob=self.keep_prob)
 			return cell
+
 		cell = tf.contrib.rnn.MultiRNNCell([single_rnn_cell() for _ in range(self.num_layers)])
 		return cell
+
 
 	def _build_global_helper(self):
 		self.encoder_inputs = tf.placeholder(tf.int32, [None, None], name="encoder_inputs")
@@ -69,16 +77,20 @@ class Seq2SeqModel(object):
 
 
 	def _build_encoder_graph(self):
+
 		with tf.variable_scope("encoder"):
 			with tf.device("/cpu:0"):
 				self.embedding = tf.get_variable("embedding", [self.vocab_size, self.embedding_dim], dtype=tf.float32)
+			
 			self.embedded_encoder_inputs = tf.nn.embedding_lookup(self.embedding, self.encoder_inputs)
 			encoder_cell = self._create_rnn_cell(reuse=None)
 			self.encoder_outputs, self.encoder_states = tf.nn.dynamic_rnn(cell=encoder_cell, inputs=self.embedded_encoder_inputs,
 				sequence_length=self.encoder_lengths, dtype=tf.float32)
 
 	def _build_decoder_graph(self):
+
 		with tf.variable_scope("decoder", reuse=None):
+
 			decoder_cell = self._create_rnn_cell(reuse=None)
 			attention_mechanism = self._create_attention(self.encoder_outputs, self.encoder_lengths)
 			
@@ -167,6 +179,7 @@ class Seq2SeqModel(object):
 					  self.decoder_targets: batch.decoder_targets,
 					  self.decoder_lengths: batch.decoder_lengths,
 					  self.keep_prob: 0.5}
+
 		_, loss, summary, step = sess.run([self.train_op, self.loss, self.merged, self.global_step], feed_dict=feed_dict)
 		return {"loss": loss, "summary": summary, "step": step}
 
@@ -178,6 +191,7 @@ class Seq2SeqModel(object):
 					  self.decoder_targets: batch.decoder_targets,
 					  self.decoder_lengths: batch.decoder_lengths,
 					  self.keep_prob: 1.0}
+
 		loss, summary = sess.run([self.loss, self.merged], feed_dict=feed_dict)
 		return {"loss": loss, "summary": summary}
 
@@ -186,6 +200,7 @@ class Seq2SeqModel(object):
 		feed_dict = {self.encoder_inputs: batch.encoder_inputs,
 					  self.encoder_lengths: batch.encoder_lengths,
 					  self.keep_prob: 1.0}
+	
 		predicted_ids, alignments = sess.run([self.infer_predicted_ids, self.infer_alignments], feed_dict=feed_dict)
 		return {"predicted_ids": predicted_ids, "alignments": alignments}
 

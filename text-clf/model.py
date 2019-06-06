@@ -8,8 +8,10 @@ import numpy as np
 import tensorflow as tf
 
 
-class HAN(object):
+class RNNTextClassification(object):
+
 	def __init__(self, hparam):
+
 		self.seq_len = hparam.seq_len
 		self.vocab_size = hparam.vocab_size
 		self.embedding_dim = hparam.embedding_dim
@@ -49,14 +51,14 @@ class HAN(object):
 
 		self.loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=y_hat, labels=self.targets))
 		self.accuracy = tf.reduce_mean(tf.cast(tf.equal(tf.round(tf.sigmoid(y_hat)), self.targets), tf.float32))
+		
 		tf.summary.scalar("loss", self.loss)
 		tf.summary.scalar("accuracy", self.accuracy)
 
 		params = tf.trainable_variables()
 		gradients = tf.gradients(self.loss, params)
 		clipped_gradients, _ = tf.clip_by_global_norm(gradients, self.clip_norm)
-		self.train_op = tf.train.AdamOptimizer(self.lr).apply_gradients(
-			zip(clipped_gradients, params), global_step=self.global_step)
+		self.train_op = tf.train.AdamOptimizer(self.lr).apply_gradients(zip(clipped_gradients, params), global_step=self.global_step)
 
 		self.saver = tf.train.Saver()
 		self.merged = tf.summary.merge_all()
@@ -80,16 +82,26 @@ class HAN(object):
 		return total_count
 
 
+	### MLP attention
 	def attention(self, rnn_outputs):
-		if isinstance(rnn_outputs, tuple):
-			inputs = tf.concat(rnn_outputs, 2) # [B,T,2H]
-		hidden_dim = inputs.shape[2].value
-		w_omega = tf.Variable(tf.random_normal([hidden_dim, self.attention_dim], stddev=0.1))
-		b_omega = tf.Variable(tf.random_normal([self.attention_dim], stddev=0.1))
-		u_omega = tf.Variable(tf.random_normal([self.attention_dim], stddev=0.1))
+			if isinstance(rnn_outputs, tuple):
+				inputs = tf.concat(rnn_outputs, 2)
+				hidden_dim = self.hidden_dim * 2
+			else:
+				inputs = rnn_outputs
+				hidden_dim = self.hidden_dim
+			
+			w_omega = tf.Variable(tf.random_normal([hidden_dim, self.attention_dim], stddev=0.1))
+			b_omega = tf.Variable(tf.random_normal([self.attention_dim], stddev=0.1))
+			u_omega = tf.Variable(tf.random_normal([self.attention_dim], stddev=0.1))
 
-		v = tf.tanh(tf.tensordot(inputs, w_omega, axes=1) + b_omega)
-		vu = tf.tensordot(v, u_omega, axes=1, name='vu')
-		alphas = tf.nn.softmax(vu, name='alphas')
-		output = tf.reduce_sum(inputs * tf.expand_dims(alphas, -1), 1)
-		return output, alphas
+			new_inputs = tf.reshape(inputs, [-1, hidden_dim])
+			v = tf.tanh(tf.matmul(new_inputs, w_omega) + b_omega)
+
+			vu = tf.reduce_sum(tf.multiply(v, u_omega), -1)
+			vu = tf.reshape(vu, [-1, self.seq_len])
+
+			alphas = tf.nn.softmax(vu, name='alphas')
+			outputs = tf.reduce_sum(inputs * tf.expand_dims(alphas, -1), 1)
+
+			return outputs, alphas

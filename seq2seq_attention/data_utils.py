@@ -27,26 +27,24 @@ class Batch(object):
 		self.decoder_lengths = []
 		self.decoder_targets = []
 
-		"""
-		self.encoder_inputs = []
-		self.encoder_inputs_length = []
-		self.decoder_targets = []
-		self.decoder_targets_length = []
-		"""
 
+def load_dataset(filename):
 
-def loadDataset(filename):
 	dataset_path = os.path.join(filename)
 	print("Loading dataset from {}".format(dataset_path))
-	with open(dataset_path, 'rb') as handle:
-		data = pickle.load(handle)
+
+	with open(dataset_path, 'rb') as f:
+		data = pickle.load(f)
+
 		word2id = data['word2id']
 		id2word = data['id2word']
 		trainingSamples = data['trainingSamples']
+
 	return word2id, id2word, trainingSamples
 
 
-def createBatch(samples):
+def create_batch(samples):
+
 	batch = Batch()
 
 	batch.encoder_lengths = [len(sample[0]) for sample in samples]
@@ -56,10 +54,13 @@ def createBatch(samples):
 	max_decoder_length = max(batch.decoder_lengths)
 
 	for sample in samples:
-		source = list(reversed(sample[0][:max_encoder_length]))
+
+		# reverse encoder input and pad in front of it.
+		source = list(reversed(sample[0][:max_encoder_length])) 
 		padding = [PAD_ID] * (max_encoder_length - len(source))
 		batch.encoder_inputs.append(padding + source)
 
+		# add GO at the beginning and pad at the end of decoder input.
 		target = sample[1][:max_decoder_length]
 		padding = [PAD_ID] * (max_decoder_length - len(target))
 		batch.decoder_targets.append(target + padding)
@@ -68,20 +69,26 @@ def createBatch(samples):
 	return batch
 
 
-def getBatches(data, batch_size):
+def get_batches(data, batch_size):
+
 	random.shuffle(data)
 	batches = []
 	data_len = len(data)
+
 	def genNextSamples():
 		for i in range(0, data_len, batch_size):
 			yield data[i:min(i + batch_size, data_len)]
+
 	for samples in genNextSamples():
-		batch = createBatch(samples)
+		batch = create_batch(samples)
 		batches.append(batch)
+
+	# return a list of batches
 	return batches
 
 
-def sentence2enco(sentence, word2id):
+
+def sentence_preprocess(sentence, word2id):
 	if sentence == "":
 		return None
 
@@ -97,5 +104,5 @@ def sentence2enco(sentence, word2id):
 	sample = (wordIds, [])
 	samples.append(sample)
 
-	batch = createBatch(samples)
+	batch = create_batch(samples)
 	return batch
