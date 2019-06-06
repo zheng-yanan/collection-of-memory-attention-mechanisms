@@ -1,4 +1,4 @@
-### super-duper-memory
+### Attention Mechanism
 
 A collection of Tensorflow implementation for various attention mechanism.
 It includes:
